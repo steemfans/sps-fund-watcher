@@ -19,6 +19,7 @@ alwaysApply: true
   - Code review comments
   - Error messages visible to developers
   - Configuration file comments
+  - Git commit messages
 - **Exception**: Plan files (`.plan.md`) in the workspace can use Chinese for better communication and understanding
 
 ## Rationale
@@ -38,10 +39,11 @@ See `project.mdc` for detailed package management rules and guidelines.
 - **Never automatically commit changes without explicit user confirmation**
 - Before creating any commit:
   1. Show the user what files will be committed (`git status`)
-  2. Present the proposed commit message
+  2. Present the proposed commit message (must be in English)
   3. Wait for explicit user approval before executing `git commit`
 - Only use `git add` and prepare commits, but always ask for confirmation before committing
 - This ensures the user maintains full control over the git history and commit timing
+- **Commit messages must be written in English** to maintain consistency with technical documentation standards
 
 ## Documentation Update Policy
 
