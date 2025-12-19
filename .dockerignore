@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.env.local
+web/node_modules
+web/dist
+web/.vite
+*.md
+.cursor
+

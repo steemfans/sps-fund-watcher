@@ -1,0 +1,25 @@
+steem:
+  api_url: "https://api.steem.fans"
+  start_block: 50000000
+  accounts:
+    - "burndao.burn"
+
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "sps_fund_watcher"
+
+telegram:
+  enabled: true
+  bot_token: ""
+  channel_id: ""
+  # Configure which operation types to notify
+  # If empty or not configured, all operation types will be notified
+  notify_operations:
+    - "transfer"
+    - "account_update"
+    - "account_update2"
+
+api:
+  port: "8080"
+  host: "0.0.0.0"
+

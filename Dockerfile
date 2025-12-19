@@ -1,0 +1,66 @@
+# Build stage for Go services
+FROM golang:1.21-alpine3.19 AS go-builder
+
+WORKDIR /build
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build sync service
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o sync ./cmd/sync
+
+# Build API service
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api
+
+# Build stage for frontend
+FROM node:20-alpine3.19 AS frontend-builder
+
+WORKDIR /build
+
+# Copy package files
+COPY web/package*.json ./
+RUN npm ci
+
+# Copy source code
+COPY web/ .
+
+# Build frontend
+RUN npm run build
+
+# Final stage
+FROM alpine:3.19
+
+# Install dependencies
+RUN apk add --no-cache \
+    nginx \
+    supervisor \
+    ca-certificates \
+    tzdata
+
+# Create app directory
+WORKDIR /app
+
+# Copy Go binaries from builder
+COPY --from=go-builder /build/sync /app/sync
+COPY --from=go-builder /build/api /app/api
+
+# Copy frontend build from builder
+COPY --from=frontend-builder /build/dist /app/web/dist
+
+# Copy configuration files
+COPY configs/ /app/configs/
+
+# Create nginx directories
+RUN mkdir -p /var/log/nginx /var/run/nginx && \
+    chown -R nginx:nginx /var/log/nginx /var/run/nginx
+
+# Expose port
+EXPOSE 80
+
+# Start supervisord
+CMD ["/usr/bin/supervisord", "-c", "/app/configs/supervisord.conf"]
+
