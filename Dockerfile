@@ -19,17 +19,20 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api
 # Build stage for frontend
 FROM node:20-alpine3.19 AS frontend-builder
 
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 WORKDIR /build
 
 # Copy package files
-COPY web/package*.json ./
-RUN npm ci
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY web/ .
 
 # Build frontend
-RUN npm run build
+RUN pnpm run build
 
 # Final stage
 FROM alpine:3.19

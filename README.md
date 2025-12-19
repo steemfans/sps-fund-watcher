@@ -69,8 +69,8 @@ go build -o api ./cmd/api
 
 ```bash
 cd web
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 ### Docker
@@ -94,7 +94,7 @@ docker run -d \
 
 ## Web Interface
 
-The web interface is available at `http://localhost` (when running in Docker) or `http://localhost:5173` (when running `npm run dev`).
+The web interface is available at `http://localhost` (when running in Docker) or `http://localhost:5173` (when running `pnpm run dev`).
 
 Features:
 - Account selector (defaults to `burndao.burn`)
@@ -108,6 +108,7 @@ Features:
 
 - Go 1.21+
 - Node.js 20+
+- pnpm (for frontend package management)
 - MongoDB
 - Docker (for containerized deployment)
 
