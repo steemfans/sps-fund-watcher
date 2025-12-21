@@ -102,6 +102,46 @@ Features:
 - Paginated operation table
 - Responsive design
 
+## Running Services
+
+### Starting Sync Service
+
+The sync service reads configuration from a YAML file. **Important**: Always use the `-config` flag when starting the service:
+
+```bash
+go run cmd/sync/main.go -config configs/config.yaml
+```
+
+Or with a custom config file:
+
+```bash
+go run cmd/sync/main.go -config configs/config.temp.yaml
+```
+
+**Note**: Without the `-config` flag, the service will use the default config file path.
+
+### Starting API Service
+
+```bash
+go run cmd/api/main.go -config configs/config.yaml
+```
+
+### Resetting Sync State
+
+If you need to restart synchronization from a specific block height, you can clear the sync state:
+
+**Option 1: Clear sync state only (keeps existing operations)**
+```bash
+docker exec sps-fund-watcher-mongo-temp mongo sps_fund_watcher --eval "db.sync_state.drop(); print('Sync state dropped')" --quiet
+```
+
+**Option 2: Clear entire database (removes all operations and sync state)**
+```bash
+docker exec sps-fund-watcher-mongo-temp mongo sps_fund_watcher --eval "db.dropDatabase(); print('Database dropped')" --quiet
+```
+
+After clearing the sync state, restart the sync service with your desired configuration. The service will start from the `start_block` specified in your config file.
+
 ## Development
 
 ### Prerequisites

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/ety001/sps-fund-watcher/internal/models"
 	"github.com/ety001/sps-fund-watcher/internal/storage"
 	"github.com/gin-gonic/gin"
 )
@@ -11,12 +12,14 @@ import (
 // Handler handles API requests
 type Handler struct {
 	storage *storage.MongoDB
+	config  *models.Config
 }
 
 // NewHandler creates a new API handler
-func NewHandler(storage *storage.MongoDB) *Handler {
+func NewHandler(storage *storage.MongoDB, config *models.Config) *Handler {
 	return &Handler{
 		storage: storage,
+		config:  config,
 	}
 }
 
@@ -84,7 +87,7 @@ func (h *Handler) GetUpdates(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	
+
 	// Get account_update and account_update2 operations
 	result1, err := h.storage.GetOperations(ctx, account, "account_update", page, pageSize)
 	if err != nil {
@@ -111,12 +114,12 @@ func (h *Handler) GetUpdates(c *gin.Context) {
 }
 
 // GetAccounts handles GET /api/v1/accounts
+// Returns the list of tracked accounts from configuration
 func (h *Handler) GetAccounts(c *gin.Context) {
-	ctx := c.Request.Context()
-	accounts, err := h.storage.GetTrackedAccounts(ctx)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	// Get accounts from configuration instead of database
+	accounts := h.config.Steem.Accounts
+	if accounts == nil {
+		accounts = []string{}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"accounts": accounts})
@@ -126,4 +129,3 @@ func (h *Handler) GetAccounts(c *gin.Context) {
 func (h *Handler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
-

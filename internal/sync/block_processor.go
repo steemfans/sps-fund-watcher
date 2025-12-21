@@ -2,12 +2,14 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/ety001/sps-fund-watcher/internal/models"
 	"github.com/ety001/sps-fund-watcher/internal/storage"
 	"github.com/ety001/sps-fund-watcher/internal/telegram"
+	protocolapi "github.com/steemit/steemutil/protocol/api"
 )
 
 // BlockProcessor processes blocks and extracts operations
@@ -51,88 +53,111 @@ func NewBlockProcessor(
 }
 
 // ProcessBlock processes a block and extracts operations for tracked accounts
-func (bp *BlockProcessor) ProcessBlock(ctx context.Context, block *Block, blockNum int64) ([]*models.Operation, error) {
-	blockTime, err := time.Parse("2006-01-02T15:04:05", block.Timestamp)
-	if err != nil {
-		// Try alternative format
-		blockTime, err = time.Parse(time.RFC3339, block.Timestamp)
-		if err != nil {
-			blockTime = time.Now()
-		}
+func (bp *BlockProcessor) ProcessBlock(ctx context.Context, block *protocolapi.Block, blockNum int64) ([]*models.Operation, error) {
+	// Parse block timestamp
+	var blockTime time.Time
+	if block.Timestamp != nil && block.Timestamp.Time != nil {
+		blockTime = *block.Timestamp.Time
+	} else {
+		blockTime = time.Now()
 	}
 
 	var operations []*models.Operation
 
 	for _, tx := range block.Transactions {
-		for _, rawOp := range tx.Operations {
-			// Operations are in format: [type, data]
-			opArray, ok := rawOp.([]interface{})
-			if !ok || len(opArray) < 2 {
+		for opIndex, protocolOp := range tx.Operations {
+			// Get operation type and data from protocol.Operation interface
+			opType := string(protocolOp.Type())
+
+			// Convert operation data to map[string]interface{}
+			opDataRaw := protocolOp.Data()
+			var opData map[string]interface{}
+
+			// Try to convert to map
+			if dataMap, ok := opDataRaw.(map[string]interface{}); ok {
+				opData = dataMap
+			} else {
+				// If it's a typed operation, marshal and unmarshal to get map
+				dataJSON, err := json.Marshal(opDataRaw)
+				if err != nil {
+					continue
+				}
+				if err := json.Unmarshal(dataJSON, &opData); err != nil {
+					continue
+				}
+			}
+
+			// Extract accounts from operation data
+			accounts := bp.extractAccounts(opType, opData)
+			if len(accounts) == 0 {
 				continue
 			}
 
-			opType, ok := opArray[0].(string)
-			if !ok {
-				continue
-			}
+			// Create operation for each tracked account
+			for _, account := range accounts {
+				// Check if account is tracked
+				if !bp.accounts[account] {
+					continue
+				}
 
-			opData, ok := opArray[1].(map[string]interface{})
-			if !ok {
-				continue
-			}
+				// Create operation model
+				op := &models.Operation{
+					BlockNum:  blockNum,
+					TrxID:     tx.TransactionId,
+					OpInTrx:   opIndex,
+					Account:   account,
+					OpType:    opType,
+					OpData:    opData,
+					Timestamp: blockTime,
+				}
 
-			// Extract account from operation data
-			account := bp.extractAccount(opType, opData)
-			if account == "" {
-				continue
+				operations = append(operations, op)
 			}
-
-			// Check if account is tracked
-			if !bp.accounts[account] {
-				continue
-			}
-
-			// Create operation model
-			op := &models.Operation{
-				BlockNum:  blockNum,
-				TrxID:     tx.TransactionID,
-				Account:   account,
-				OpType:    opType,
-				OpData:    opData,
-				Timestamp: blockTime,
-			}
-
-			operations = append(operations, op)
 		}
 	}
 
 	return operations, nil
 }
 
-// extractAccount extracts the account name from operation data
-func (bp *BlockProcessor) extractAccount(opType string, opData map[string]interface{}) string {
+// extractAccounts extracts account names from operation data
+// Returns a slice of accounts involved in the operation
+func (bp *BlockProcessor) extractAccounts(opType string, opData map[string]interface{}) []string {
+	var accounts []string
+
 	// Try common account fields
 	if account, ok := opData["account"].(string); ok {
-		return account
-	}
-	if account, ok := opData["from"].(string); ok {
-		return account
+		accounts = append(accounts, account)
 	}
 	if account, ok := opData["owner"].(string); ok {
-		return account
+		accounts = append(accounts, account)
 	}
 
-	// For transfer operations, check both from and to
+	// For transfer operations, include both from and to
 	if opType == "transfer" {
 		if from, ok := opData["from"].(string); ok {
-			return from
+			accounts = append(accounts, from)
 		}
 		if to, ok := opData["to"].(string); ok {
-			return to
+			accounts = append(accounts, to)
+		}
+	} else {
+		// For other operations, try from field
+		if account, ok := opData["from"].(string); ok {
+			accounts = append(accounts, account)
 		}
 	}
 
-	return ""
+	// Remove duplicates
+	accountMap := make(map[string]bool)
+	var uniqueAccounts []string
+	for _, acc := range accounts {
+		if !accountMap[acc] {
+			accountMap[acc] = true
+			uniqueAccounts = append(uniqueAccounts, acc)
+		}
+	}
+
+	return uniqueAccounts
 }
 
 // SaveOperations saves operations to storage and sends notifications
@@ -173,4 +198,3 @@ func (bp *BlockProcessor) SaveOperations(ctx context.Context, operations []*mode
 
 	return nil
 }
-

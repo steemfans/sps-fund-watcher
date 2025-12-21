@@ -9,22 +9,24 @@ import (
 	"github.com/ety001/sps-fund-watcher/internal/models"
 	"github.com/ety001/sps-fund-watcher/internal/storage"
 	"github.com/ety001/sps-fund-watcher/internal/telegram"
+	"github.com/steemit/steemgosdk"
 )
 
 // Syncer handles the synchronization process
 type Syncer struct {
-	steemClient   *SteemClient
-	storage       *storage.MongoDB
-	telegram      *telegram.Client
-	processor     *BlockProcessor
-	config        *models.Config
-	stopChan      chan struct{}
+	steemAPI  *steemgosdk.API
+	storage   *storage.MongoDB
+	telegram  *telegram.Client
+	processor *BlockProcessor
+	config    *models.Config
+	stopChan  chan struct{}
 }
 
 // NewSyncer creates a new syncer
 func NewSyncer(config *models.Config) (*Syncer, error) {
-	// Initialize Steem client
-	steemClient := NewSteemClient(config.Steem.APIURL)
+	// Initialize Steem client using steemgosdk
+	client := steemgosdk.GetClient(config.Steem.APIURL)
+	steemAPI := client.GetAPI()
 
 	// Initialize MongoDB storage
 	mongoStorage, err := storage.NewMongoDB(config.MongoDB.URI, config.MongoDB.Database)
@@ -54,12 +56,12 @@ func NewSyncer(config *models.Config) (*Syncer, error) {
 	)
 
 	return &Syncer{
-		steemClient: steemClient,
-		storage:     mongoStorage,
-		telegram:    tgClient,
-		processor:   processor,
-		config:      config,
-		stopChan:    make(chan struct{}),
+		steemAPI:  steemAPI,
+		storage:   mongoStorage,
+		telegram:  tgClient,
+		processor: processor,
+		config:    config,
+		stopChan:  make(chan struct{}),
 	}, nil
 }
 
@@ -107,10 +109,11 @@ func (s *Syncer) Start(ctx context.Context) error {
 // syncBlocks syncs blocks from startBlock to latest irreversible block
 func (s *Syncer) syncBlocks(ctx context.Context, startBlock int64) error {
 	// Get latest irreversible block
-	latestIrreversible, err := s.steemClient.GetLatestIrreversibleBlockNum()
+	dgp, err := s.steemAPI.GetDynamicGlobalProperties()
 	if err != nil {
-		return fmt.Errorf("failed to get latest irreversible block: %w", err)
+		return fmt.Errorf("failed to get dynamic global properties: %w", err)
 	}
+	latestIrreversible := int64(dgp.LastIrreversibleBlockNum)
 
 	if startBlock > latestIrreversible {
 		// No new blocks to sync
@@ -130,7 +133,7 @@ func (s *Syncer) syncBlocks(ctx context.Context, startBlock int64) error {
 		}
 
 		for blockNum := currentBlock; blockNum <= endBlock; blockNum++ {
-			block, err := s.steemClient.GetBlock(blockNum)
+			block, err := s.steemAPI.GetBlock(uint(blockNum))
 			if err != nil {
 				return fmt.Errorf("failed to get block %d: %w", blockNum, err)
 			}
@@ -176,4 +179,3 @@ func (s *Syncer) Stop() {
 func (s *Syncer) Close() error {
 	return s.storage.Close()
 }
-

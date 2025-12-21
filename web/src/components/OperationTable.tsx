@@ -6,7 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Operation } from "@/api/client"
+import type { Operation } from "@/api/client"
 import { Button } from "@/components/ui/button"
 
 interface OperationTableProps {
@@ -47,7 +47,7 @@ export function OperationTable({
     )
   }
 
-  if (operations.length === 0) {
+  if (!operations || operations.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-muted-foreground">No operations found</div>

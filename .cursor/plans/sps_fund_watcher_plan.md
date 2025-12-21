@@ -42,7 +42,9 @@ sps-fund-watcher/
 - 从 YAML 文件读取配置
 - 初始化 MongoDB 连接
 - 初始化 Telegram 客户端（如果已配置）
-- 使用 steemgosdk 连接 Steem API（默认：https://api.steem.fans）
+- 使用自定义 JSON-RPC 客户端连接 Steem API（默认：https://api.steem.fans）
+  - 实现轻量级的 JSON-RPC 客户端，仅包含必要的 API 调用（get_block, get_dynamic_global_properties）
+  - 避免依赖可能不活跃的第三方 SDK
 - 从配置的区块高度开始
 - 持续获取区块直到最新不可逆高度
 - 按追踪账号过滤操作
@@ -51,6 +53,7 @@ sps-fund-watcher/
 
 **关键组件：**
 - `internal/sync/syncer.go`: 主同步循环逻辑
+- `internal/sync/steem_client.go`: 自定义 Steem JSON-RPC 客户端实现
 - `internal/sync/block_processor.go`: 处理单个区块和操作
 - `internal/storage/mongodb.go`: MongoDB 操作（插入、查询）
 - `internal/telegram/client.go`: Telegram Bot API 客户端
@@ -159,9 +162,9 @@ api:
 
 **Go:**
 - `github.com/gin-gonic/gin` - Web 框架
-- `github.com/steem-go/steemgosdk` - Steem 区块链 SDK
 - `go.mongodb.org/mongo-driver` - MongoDB 驱动
 - `gopkg.in/yaml.v3` - YAML 配置解析
+- 自定义 JSON-RPC 客户端实现（不依赖第三方 Steem SDK，因为 steemgosdk 项目已不活跃）
 
 **前端:**
 - `react`, `react-dom`
@@ -174,7 +177,7 @@ api:
 
 1. 设置 Go 项目结构和依赖
 2. 实现 MongoDB 存储层
-3. 实现带 steemgosdk 的同步服务
+3. 实现自定义 Steem JSON-RPC 客户端和同步服务
 4. 实现 Telegram 通知客户端（支持 operation 类型过滤）
 5. 实现带 Gin 的 API 服务
 6. 设置前端项目（Vite + React + Tailwind + shadcn）

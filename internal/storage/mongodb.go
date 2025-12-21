@@ -64,20 +64,36 @@ func (m *MongoDB) InsertOperation(ctx context.Context, op *models.Operation) err
 }
 
 // InsertOperations inserts multiple operations into MongoDB
+// Uses upsert to prevent duplicates based on unique index
 func (m *MongoDB) InsertOperations(ctx context.Context, ops []*models.Operation) error {
 	if len(ops) == 0 {
 		return nil
 	}
 
-	docs := make([]interface{}, len(ops))
 	now := time.Now()
-	for i, op := range ops {
+	for _, op := range ops {
 		op.CreatedAt = now
-		docs[i] = op
+
+		// Use upsert to prevent duplicates
+		filter := bson.M{
+			"block_num": op.BlockNum,
+			"trx_id":    op.TrxID,
+			"op_in_trx": op.OpInTrx,
+			"account":   op.Account,
+		}
+
+		update := bson.M{
+			"$set": op,
+		}
+
+		opts := options.Update().SetUpsert(true)
+		_, err := m.operations.UpdateOne(ctx, filter, update, opts)
+		if err != nil {
+			return fmt.Errorf("failed to upsert operation: %w", err)
+		}
 	}
 
-	_, err := m.operations.InsertMany(ctx, docs)
-	return err
+	return nil
 }
 
 // GetOperations retrieves operations with pagination
@@ -195,6 +211,18 @@ func (m *MongoDB) GetTrackedAccounts(ctx context.Context) ([]string, error) {
 
 // CreateIndexes creates necessary indexes for better query performance
 func (m *MongoDB) CreateIndexes(ctx context.Context) error {
+	// Unique index to prevent duplicate operations
+	// An operation is uniquely identified by block_num + trx_id + op_in_trx + account
+	uniqueIndex := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "block_num", Value: 1},
+			{Key: "trx_id", Value: 1},
+			{Key: "op_in_trx", Value: 1},
+			{Key: "account", Value: 1},
+		},
+		Options: options.Index().SetUnique(true),
+	}
+
 	// Index on account and block_num for faster queries
 	accountIndex := mongo.IndexModel{
 		Keys: bson.D{
@@ -214,10 +242,10 @@ func (m *MongoDB) CreateIndexes(ctx context.Context) error {
 	}
 
 	_, err := m.operations.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		uniqueIndex,
 		accountIndex,
 		opTypeIndex,
 		timestampIndex,
 	})
 	return err
 }
-

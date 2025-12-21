@@ -9,7 +9,7 @@ const apiClient = axios.create({
   },
 });
 
-export interface Operation {
+export type Operation = {
   id: string;
   block_num: number;
   trx_id: string;
@@ -20,7 +20,7 @@ export interface Operation {
   created_at: string;
 }
 
-export interface OperationResponse {
+export type OperationResponse = {
   operations: Operation[];
   total: number;
   page: number;

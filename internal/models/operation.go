@@ -7,6 +7,7 @@ type Operation struct {
 	ID        string                 `bson:"_id,omitempty" json:"id"`
 	BlockNum  int64                  `bson:"block_num" json:"block_num"`
 	TrxID     string                 `bson:"trx_id" json:"trx_id"`
+	OpInTrx   int                    `bson:"op_in_trx" json:"op_in_trx"` // Operation index in transaction
 	Account   string                 `bson:"account" json:"account"`
 	OpType    string                 `bson:"op_type" json:"op_type"`
 	OpData    map[string]interface{} `bson:"op_data" json:"op_data"`
@@ -16,10 +17,10 @@ type Operation struct {
 
 // SyncState represents the current sync state
 type SyncState struct {
-	ID                      string    `bson:"_id,omitempty" json:"id"`
-	LastBlock               int64     `bson:"last_block" json:"last_block"`
-	LastIrreversibleBlock   int64     `bson:"last_irreversible_block" json:"last_irreversible_block"`
-	UpdatedAt               time.Time `bson:"updated_at" json:"updated_at"`
+	ID                    string    `bson:"_id,omitempty" json:"id"`
+	LastBlock             int64     `bson:"last_block" json:"last_block"`
+	LastIrreversibleBlock int64     `bson:"last_irreversible_block" json:"last_irreversible_block"`
+	UpdatedAt             time.Time `bson:"updated_at" json:"updated_at"`
 }
 
 // OperationResponse represents a paginated operation response
@@ -30,4 +31,3 @@ type OperationResponse struct {
 	PageSize   int         `json:"page_size"`
 	HasMore    bool        `json:"has_more"`
 }
-

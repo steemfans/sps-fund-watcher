@@ -1,0 +1,23 @@
+steem:
+  api_url: "https://api.steem.fans"
+  start_block: 101500000
+  accounts:
+    - "burndao.burn"
+    - "ety001"
+
+mongodb:
+  uri: "mongodb://localhost:27018"
+  database: "sps_fund_watcher"
+
+telegram:
+  enabled: false
+  bot_token: ""
+  channel_id: ""
+  notify_operations:
+    - "transfer"
+    - "account_update"
+    - "account_update2"
+
+api:
+  port: "8081"
+  host: "0.0.0.0"

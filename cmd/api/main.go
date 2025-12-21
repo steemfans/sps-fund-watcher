@@ -42,7 +42,7 @@ func main() {
 	}
 
 	// Setup API handler and routes
-	handler := api.NewHandler(mongoStorage)
+	handler := api.NewHandler(mongoStorage, config)
 	router := api.SetupRoutes(handler)
 
 	// Setup server
@@ -89,4 +89,3 @@ func loadConfig(path string) (*models.Config, error) {
 
 	return &config, nil
 }
-

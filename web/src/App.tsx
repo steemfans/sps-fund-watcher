@@ -2,7 +2,8 @@ import { useState, useEffect } from "react"
 import { AccountSelector } from "@/components/AccountSelector"
 import { OperationTable } from "@/components/OperationTable"
 import { Select } from "@/components/ui/select"
-import { api, Operation } from "@/api/client"
+import { api } from "@/api/client"
+import type { Operation } from "@/api/client"
 
 type OperationType = "all" | "transfer" | "account_update" | "account_update2"
 
@@ -37,9 +38,9 @@ function App() {
         response = await api.getOperations(account, undefined, page, pageSize)
       }
 
-      setOperations(response.operations)
-      setTotal(response.total)
-      setHasMore(response.has_more)
+      setOperations(response.operations || [])
+      setTotal(response.total || 0)
+      setHasMore(response.has_more || false)
     } catch (error) {
       console.error("Failed to load operations:", error)
       setOperations([])
