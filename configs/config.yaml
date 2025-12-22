@@ -6,7 +6,7 @@ steem:
     - "burndao.burn"
 
 mongodb:
-  uri: "mongodb://localhost:27017"
+  uri: "mongodb://mongo:27017"
   database: "sps_fund_watcher"
 
 telegram:
@@ -14,8 +14,8 @@ telegram:
   bot_token: ""
   channel_id: ""
   # Only notify for these accounts (empty means notify for all tracked accounts)
-  # Both accounts and notify_operations must match for a notification to be sent
-  accounts: []
+  accounts: 
+    - "burndao.burn"
   # Configure which operation types to notify
   # If empty or not configured, all operation types will be notified
   notify_operations:
@@ -25,7 +25,14 @@ telegram:
     - "limit_order_cancel"
   # Custom message template (optional, uses default if not specified)
   # Available variables: {{.Account}}, {{.OpType}}, {{.BlockNum}}, {{.Timestamp}}, {{.Details}}
-  # message_template: ""
+  message_template: |
+    <b>Account:</b> <code>{{.Account}}</code>
+    <b>Type:</b> <code>{{.OpType}}</code>
+    <b>Block:</b> <code>{{.BlockNum}}</code>
+    <b>Time:</b> <code>{{.Timestamp}}</code>
+    
+    <b>Details:</b>
+    {{.Details}}
 
 api:
   port: "8080"

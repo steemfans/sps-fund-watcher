@@ -3,7 +3,6 @@ steem:
   start_block: 101777000
   batch_size: 100  # Number of blocks to fetch in each batch
   accounts:
-    - "burndao.burn"
     - "ety001"
 
 mongodb:
@@ -16,9 +15,9 @@ telegram:
   channel_id: ""
   # Only notify for these accounts (empty means notify for all tracked accounts)
   accounts:
-    - "burndao.burn"
     - "ety001"
-  # Only notify for these operation types (empty means notify for all operations)
+  # Configure which operation types to notify
+  # If empty or not configured, all operation types will be notified
   notify_operations:
     - "transfer"
     - "account_update"
@@ -27,8 +26,6 @@ telegram:
   # Custom message template (optional, uses default if not specified)
   # Available variables: {{.Account}}, {{.OpType}}, {{.BlockNum}}, {{.Timestamp}}, {{.Details}}
   message_template: |
-    <b>🔔 New Operation</b>
-    
     <b>Account:</b> <code>{{.Account}}</code>
     <b>Type:</b> <code>{{.OpType}}</code>
     <b>Block:</b> <code>{{.BlockNum}}</code>
@@ -40,3 +37,4 @@ telegram:
 api:
   port: "8081"
   host: "0.0.0.0"
+
