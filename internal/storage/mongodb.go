@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/ety001/sps-fund-watcher/internal/models"
@@ -162,7 +163,21 @@ func (m *MongoDB) GetSyncState(ctx context.Context) (*models.SyncState, error) {
 }
 
 // UpdateSyncState updates the sync state
+// Ensures last_block only increases to prevent rollback issues
 func (m *MongoDB) UpdateSyncState(ctx context.Context, lastBlock, lastIrreversibleBlock int64) error {
+	// Get current state to ensure we don't rollback
+	currentState, err := m.GetSyncState(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get current sync state: %w", err)
+	}
+
+	// Only update if the new lastBlock is greater than current
+	// This prevents rollback issues
+	if lastBlock <= currentState.LastBlock {
+		log.Printf("Skipping sync state update: new lastBlock %d is not greater than current %d", lastBlock, currentState.LastBlock)
+		return nil
+	}
+
 	state := models.SyncState{
 		LastBlock:             lastBlock,
 		LastIrreversibleBlock: lastIrreversibleBlock,
@@ -173,8 +188,82 @@ func (m *MongoDB) UpdateSyncState(ctx context.Context, lastBlock, lastIrreversib
 	filter := bson.M{}
 	update := bson.M{"$set": state}
 
-	_, err := m.syncState.UpdateOne(ctx, filter, update, opts)
+	_, err = m.syncState.UpdateOne(ctx, filter, update, opts)
 	return err
+}
+
+
+// SaveOperationsAndUpdateSyncState saves operations and updates sync state
+// Uses atomic update with $max to ensure last_block only increases
+// Note: This doesn't use transactions as single-node MongoDB doesn't support them
+// WARNING: Multiple processes can still write concurrently, but $max prevents rollback
+func (m *MongoDB) SaveOperationsAndUpdateSyncState(ctx context.Context, ops []*models.Operation, lastBlock, lastIrreversibleBlock int64) error {
+	log.Printf("[DEBUG] SaveOperationsAndUpdateSyncState called: opsCount=%d, lastBlock=%d, lastIrreversibleBlock=%d",
+		len(ops), lastBlock, lastIrreversibleBlock)
+
+	// Save operations first
+	if len(ops) > 0 {
+		now := time.Now()
+		for i, op := range ops {
+			op.CreatedAt = now
+
+			filter := bson.M{
+				"block_num": op.BlockNum,
+				"trx_id":    op.TrxID,
+				"op_in_trx": op.OpInTrx,
+				"account":   op.Account,
+			}
+
+			update := bson.M{
+				"$set": op,
+			}
+
+			opts := options.Update().SetUpsert(true)
+			result, err := m.operations.UpdateOne(ctx, filter, update, opts)
+			if err != nil {
+				log.Printf("[DEBUG] Failed to upsert operation %d/%d: %v", i+1, len(ops), err)
+				return fmt.Errorf("failed to upsert operation: %w", err)
+			}
+			log.Printf("[DEBUG] Upserted operation %d/%d: Matched=%d, Modified=%d, Upserted=%d",
+				i+1, len(ops), result.MatchedCount, result.ModifiedCount, result.UpsertedCount)
+		}
+		log.Printf("[DEBUG] Successfully saved %d operations", len(ops))
+	}
+
+	// Update sync state using atomic $max operator to ensure last_block only increases
+	// This prevents rollback even without transactions
+	filter := bson.M{}
+	update := bson.M{
+		"$set": bson.M{
+			"last_irreversible_block": lastIrreversibleBlock,
+			"updated_at":               time.Now(),
+		},
+		"$max": bson.M{
+			"last_block": lastBlock,
+		},
+	}
+
+	opts := options.Update().SetUpsert(true)
+	log.Printf("[DEBUG] Updating sync state atomically: LastBlock=%d (using $max), LastIrreversibleBlock=%d", lastBlock, lastIrreversibleBlock)
+	result, err := m.syncState.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		log.Printf("[DEBUG] Failed to update sync state: %v", err)
+		return fmt.Errorf("failed to update sync state: %w", err)
+	}
+	log.Printf("[DEBUG] Sync state updated: Matched=%d, Modified=%d, Upserted=%d",
+		result.MatchedCount, result.ModifiedCount, result.UpsertedCount)
+
+	// Verify the update was successful by reading back
+	verifyState, err := m.GetSyncState(ctx)
+	if err != nil {
+		log.Printf("[DEBUG] Warning: failed to verify sync state after update: %v", err)
+	} else {
+		log.Printf("[DEBUG] Verified sync state after update: LastBlock=%d, LastIrreversibleBlock=%d",
+			verifyState.LastBlock, verifyState.LastIrreversibleBlock)
+	}
+
+	log.Printf("[DEBUG] SaveOperationsAndUpdateSyncState completed successfully")
+	return nil
 }
 
 // GetTrackedAccounts returns list of unique tracked accounts

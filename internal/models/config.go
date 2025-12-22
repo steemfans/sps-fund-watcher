@@ -13,6 +13,7 @@ type SteemConfig struct {
 	APIURL     string   `yaml:"api_url"`
 	StartBlock int64    `yaml:"start_block"`
 	Accounts   []string `yaml:"accounts"`
+	BatchSize  int64    `yaml:"batch_size"` // Number of blocks to fetch in each batch
 }
 
 // MongoDBConfig contains MongoDB connection configuration
@@ -34,4 +35,3 @@ type APIConfig struct {
 	Port string `yaml:"port"`
 	Host string `yaml:"host"`
 }
-
