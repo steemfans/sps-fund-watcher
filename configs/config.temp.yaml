@@ -1,7 +1,7 @@
 steem:
   api_url: "https://api.steem.fans"
   start_block: 101500000
-  batch_size: 10  # Number of blocks to fetch in each batch
+  batch_size: 100  # Number of blocks to fetch in each batch
   accounts:
     - "burndao.burn"
     - "ety001"
