@@ -1,6 +1,6 @@
 steem:
   api_url: "https://api.steem.fans"
-  start_block: 101500000
+  start_block: 101777000
   batch_size: 100  # Number of blocks to fetch in each batch
   accounts:
     - "burndao.burn"
@@ -11,13 +11,31 @@ mongodb:
   database: "sps_fund_watcher"
 
 telegram:
-  enabled: false
+  enabled: true
   bot_token: ""
   channel_id: ""
+  # Only notify for these accounts (empty means notify for all tracked accounts)
+  accounts:
+    - "burndao.burn"
+    - "ety001"
+  # Only notify for these operation types (empty means notify for all operations)
   notify_operations:
     - "transfer"
     - "account_update"
-    - "account_update2"
+    - "limit_order_create"
+    - "limit_order_cancel"
+  # Custom message template (optional, uses default if not specified)
+  # Available variables: {{.Account}}, {{.OpType}}, {{.BlockNum}}, {{.Timestamp}}, {{.Details}}
+  message_template: |
+    <b>🔔 New Operation</b>
+    
+    <b>Account:</b> <code>{{.Account}}</code>
+    <b>Type:</b> <code>{{.OpType}}</code>
+    <b>Block:</b> <code>{{.BlockNum}}</code>
+    <b>Time:</b> <code>{{.Timestamp}}</code>
+    
+    <b>Details:</b>
+    {{.Details}}
 
 api:
   port: "8081"
