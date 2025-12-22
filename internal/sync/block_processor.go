@@ -14,11 +14,14 @@ import (
 
 // BlockProcessor processes blocks and extracts operations
 type BlockProcessor struct {
-	storage      *storage.MongoDB
-	telegram     *telegram.Client
-	accounts     map[string]bool
-	notifyOps    map[string]bool
-	notifyAllOps bool
+	storage         *storage.MongoDB
+	telegram        *telegram.Client
+	accounts        map[string]bool
+	notifyOps       map[string]bool
+	notifyAllOps    bool
+	notifyAccounts  map[string]bool
+	notifyAllAccts  bool
+	messageTemplate string
 }
 
 // NewBlockProcessor creates a new block processor
@@ -27,6 +30,8 @@ func NewBlockProcessor(
 	telegram *telegram.Client,
 	accounts []string,
 	notifyOperations []string,
+	notifyAccounts []string,
+	messageTemplate string,
 ) *BlockProcessor {
 	// Create account map for fast lookup
 	accountMap := make(map[string]bool)
@@ -43,12 +48,24 @@ func NewBlockProcessor(
 		}
 	}
 
+	// Create notify accounts map
+	notifyAcctsMap := make(map[string]bool)
+	notifyAllAccts := len(notifyAccounts) == 0
+	if !notifyAllAccts {
+		for _, account := range notifyAccounts {
+			notifyAcctsMap[account] = true
+		}
+	}
+
 	return &BlockProcessor{
-		storage:      storage,
-		telegram:     telegram,
-		accounts:     accountMap,
-		notifyOps:    notifyOpsMap,
-		notifyAllOps: notifyAllOps,
+		storage:         storage,
+		telegram:        telegram,
+		accounts:        accountMap,
+		notifyOps:       notifyOpsMap,
+		notifyAllOps:    notifyAllOps,
+		notifyAccounts:  notifyAcctsMap,
+		notifyAllAccts:  notifyAllAccts,
+		messageTemplate: messageTemplate,
 	}
 }
 
@@ -172,21 +189,42 @@ func (bp *BlockProcessor) SaveOperations(ctx context.Context, operations []*mode
 	}
 
 	// Send Telegram notifications for matching operations
+	// Only notify if both account and operation type match the filters
 	if bp.telegram != nil {
 		for _, op := range operations {
-			shouldNotify := bp.notifyAllOps
-			if !shouldNotify {
-				shouldNotify = bp.notifyOps[op.OpType]
+			// Check if operation type matches
+			opTypeMatches := bp.notifyAllOps
+			if !opTypeMatches {
+				opTypeMatches = bp.notifyOps[op.OpType]
 			}
 
-			if shouldNotify {
-				message := telegram.FormatOperationMessage(
-					op.Account,
-					op.OpType,
-					op.OpData,
-					op.BlockNum,
-					op.Timestamp,
-				)
+			// Check if account matches
+			accountMatches := bp.notifyAllAccts
+			if !accountMatches {
+				accountMatches = bp.notifyAccounts[op.Account]
+			}
+
+			// Only notify if both conditions are met
+			if opTypeMatches && accountMatches {
+				var message string
+				if bp.messageTemplate != "" {
+					message = telegram.FormatOperationMessageWithTemplate(
+						bp.messageTemplate,
+						op.Account,
+						op.OpType,
+						op.OpData,
+						op.BlockNum,
+						op.Timestamp,
+					)
+				} else {
+					message = telegram.FormatOperationMessage(
+						op.Account,
+						op.OpType,
+						op.OpData,
+						op.BlockNum,
+						op.Timestamp,
+					)
+				}
 
 				if err := bp.telegram.SendMessage(message); err != nil {
 					// Log error but don't fail the sync

@@ -33,10 +33,13 @@ export function OperationTable({
   }
 
   const formatOpData = (opData: Record<string, any>) => {
-    const entries = Object.entries(opData)
+    const filtered = Object.entries(opData)
       .filter(([key]) => key !== "memo" && key !== "json_metadata")
-      .slice(0, 3)
-    return entries.map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join(", ")
+      .reduce((acc, [key, value]) => {
+        acc[key] = value
+        return acc
+      }, {} as Record<string, any>)
+    return JSON.stringify(filtered, null, 2)
   }
 
   if (loading) {
@@ -89,8 +92,10 @@ export function OperationTable({
                     {op.op_type}
                   </span>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground max-w-md truncate">
-                  {formatOpData(op.op_data)}
+                <TableCell className="text-sm text-muted-foreground">
+                  <pre className="whitespace-pre-wrap break-words font-mono text-xs max-w-md">
+                    {formatOpData(op.op_data)}
+                  </pre>
                 </TableCell>
               </TableRow>
             ))}

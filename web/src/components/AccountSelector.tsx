@@ -29,8 +29,8 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
   }, [value, onChange])
 
   return (
-    <div className="flex items-center gap-2">
-      <label htmlFor="account-select" className="text-sm font-medium">
+    <div className="flex items-center gap-2 flex-shrink-0">
+      <label htmlFor="account-select" className="text-sm font-medium whitespace-nowrap">
         Account:
       </label>
       <Select
@@ -38,7 +38,7 @@ export function AccountSelector({ value, onChange }: AccountSelectorProps) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={loading}
-        className="min-w-[200px]"
+        className="min-w-[200px] flex-1 w-full"
       >
         {accounts.map((account) => (
           <option key={account} value={account}>

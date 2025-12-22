@@ -27,7 +27,9 @@ type TelegramConfig struct {
 	Enabled          bool     `yaml:"enabled"`
 	BotToken         string   `yaml:"bot_token"`
 	ChannelID        string   `yaml:"channel_id"`
+	Accounts         []string `yaml:"accounts"`          // Empty means notify for all tracked accounts
 	NotifyOperations []string `yaml:"notify_operations"` // Empty means notify all operations
+	MessageTemplate  string   `yaml:"message_template"` // Custom message template (optional)
 }
 
 // APIConfig contains API server configuration

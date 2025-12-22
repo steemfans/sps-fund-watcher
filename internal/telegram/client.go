@@ -117,6 +117,45 @@ func FormatOperationMessage(account, opType string, opData map[string]interface{
 	return builder.String()
 }
 
+// FormatOperationMessageWithTemplate formats an operation using a custom template
+// Template variables:
+//   - {{.Account}} - Account name
+//   - {{.OpType}} - Operation type
+//   - {{.BlockNum}} - Block number
+//   - {{.Timestamp}} - Timestamp (formatted as "2006-01-02 15:04:05 UTC")
+//   - {{.Details}} - Operation details (formatted as key: value pairs)
+func FormatOperationMessageWithTemplate(template string, account, opType string, opData map[string]interface{}, blockNum int64, timestamp time.Time) string {
+	// Format details
+	var detailsBuilder strings.Builder
+	if opData != nil {
+		for key, value := range opData {
+			// Skip internal fields
+			if key == "memo" || key == "json_metadata" {
+				continue
+			}
+			valueStr := fmt.Sprintf("%v", value)
+			if len(valueStr) > 100 {
+				valueStr = valueStr[:100] + "..."
+			}
+			detailsBuilder.WriteString(fmt.Sprintf("  • <b>%s:</b> <code>%s</code>\n", key, escapeHTML(valueStr)))
+		}
+	}
+	details := detailsBuilder.String()
+	if details == "" {
+		details = "  (no details)"
+	}
+
+	// Replace template variables
+	result := template
+	result = strings.ReplaceAll(result, "{{.Account}}", account)
+	result = strings.ReplaceAll(result, "{{.OpType}}", opType)
+	result = strings.ReplaceAll(result, "{{.BlockNum}}", fmt.Sprintf("%d", blockNum))
+	result = strings.ReplaceAll(result, "{{.Timestamp}}", timestamp.Format("2006-01-02 15:04:05 UTC"))
+	result = strings.ReplaceAll(result, "{{.Details}}", details)
+
+	return result
+}
+
 // escapeHTML escapes HTML special characters
 func escapeHTML(s string) string {
 	s = strings.ReplaceAll(s, "&", "&amp;")

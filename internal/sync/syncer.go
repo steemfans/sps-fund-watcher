@@ -53,6 +53,8 @@ func NewSyncer(config *models.Config) (*Syncer, error) {
 		tgClient,
 		config.Steem.Accounts,
 		config.Telegram.NotifyOperations,
+		config.Telegram.Accounts,
+		config.Telegram.MessageTemplate,
 	)
 
 	return &Syncer{
@@ -197,14 +199,23 @@ func (s *Syncer) syncBlocks(ctx context.Context, startBlock int64) error {
 
 			lastSyncedBlock = blockNum
 
-			// Save operations and update sync state
-			// Uses atomic $max operator to ensure last_block only increases (no transactions needed)
-			log.Printf("[DEBUG] Saving operations and updating sync state for block %d (lastSyncedBlock=%d, latestIrreversible=%d)",
-				blockNum, lastSyncedBlock, latestIrreversible)
-			if err := s.storage.SaveOperationsAndUpdateSyncState(ctx, operations, lastSyncedBlock, latestIrreversible); err != nil {
-				return fmt.Errorf("failed to save operations and update sync state for block %d: %w", blockNum, err)
+			// Save operations (this will also send Telegram notifications if enabled)
+			if len(operations) > 0 {
+				log.Printf("[DEBUG] Saving %d operations for block %d", len(operations), blockNum)
+				if err := s.processor.SaveOperations(ctx, operations); err != nil {
+					return fmt.Errorf("failed to save operations for block %d: %w", blockNum, err)
+				}
+				log.Printf("[DEBUG] Successfully saved operations for block %d", blockNum)
 			}
-			log.Printf("[DEBUG] Successfully saved operations and updated sync state for block %d", blockNum)
+
+			// Update sync state
+			// Uses atomic $max operator to ensure last_block only increases (no transactions needed)
+			log.Printf("[DEBUG] Updating sync state for block %d (lastSyncedBlock=%d, latestIrreversible=%d)",
+				blockNum, lastSyncedBlock, latestIrreversible)
+			if err := s.storage.UpdateSyncState(ctx, lastSyncedBlock, latestIrreversible); err != nil {
+				return fmt.Errorf("failed to update sync state for block %d: %w", blockNum, err)
+			}
+			log.Printf("[DEBUG] Successfully updated sync state for block %d", blockNum)
 
 			if len(operations) > 0 {
 				log.Printf("[INFO] Block %d: saved %d operations", blockNum, len(operations))

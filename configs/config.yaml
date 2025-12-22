@@ -1,7 +1,7 @@
 steem:
   api_url: "https://api.steem.fans"
-  start_block: 50000000
-  batch_size: 10  # Number of blocks to fetch in each batch
+  start_block: 101777000
+  batch_size: 100 # Number of blocks to fetch in each batch
   accounts:
     - "burndao.burn"
 
@@ -13,12 +13,19 @@ telegram:
   enabled: true
   bot_token: ""
   channel_id: ""
+  # Only notify for these accounts (empty means notify for all tracked accounts)
+  # Both accounts and notify_operations must match for a notification to be sent
+  accounts: []
   # Configure which operation types to notify
   # If empty or not configured, all operation types will be notified
   notify_operations:
     - "transfer"
     - "account_update"
-    - "account_update2"
+    - "limit_order_create"
+    - "limit_order_cancel"
+  # Custom message template (optional, uses default if not specified)
+  # Available variables: {{.Account}}, {{.OpType}}, {{.BlockNum}}, {{.Timestamp}}, {{.Details}}
+  # message_template: ""
 
 api:
   port: "8080"
