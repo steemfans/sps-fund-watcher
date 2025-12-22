@@ -19,8 +19,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api
 # Build stage for frontend
 FROM node:20-alpine3.19 AS frontend-builder
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install pnpm using npm (more stable than corepack)
+RUN npm install -g pnpm@latest
 
 WORKDIR /build
 

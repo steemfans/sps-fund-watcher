@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: sps-fund-watcher-mongo
+    restart: unless-stopped
+    #ports:
+    #  - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    networks:
+      - sps-fund-watcher-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sps-fund-watcher:
+    #build:
+    #  context: .
+    #  dockerfile: Dockerfile
+    image: steemfans/sps-fund-watcher:latest
+    container_name: sps-fund-watcher
+    restart: unless-stopped
+    #ports:
+    #  - "80:80"
+    volumes:
+      - ./configs/config.yaml:/app/configs/config.yaml:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - sps-fund-watcher-network
+
+volumes:
+  mongo_data:
+    driver: local
+  mongo_config:
+    driver: local
+
+networks:
+  sps-fund-watcher-network:
+    driver: bridge
+
