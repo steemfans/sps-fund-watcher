@@ -26,6 +26,8 @@ telegram:
   # Custom message template (optional, uses default if not specified)
   # Available variables: {{.Account}}, {{.OpType}}, {{.BlockNum}}, {{.Timestamp}}, {{.Details}}
   message_template: |
+    🔔 <b>New Operation</b>
+
     <b>Account:</b> <code>{{.Account}}</code>
     <b>Type:</b> <code>{{.OpType}}</code>
     <b>Block:</b> <code>{{.BlockNum}}</code>
