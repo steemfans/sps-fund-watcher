@@ -6,6 +6,7 @@ A comprehensive system for monitoring Steem blockchain operations for tracked ac
 
 - **Blockchain Sync Service**: Continuously syncs Steem blockchain data from a configured block height to the latest irreversible block
 - **Account Tracking**: Monitor specific Steem accounts for all operations
+- **Compensator Tool**: Fetch historical operations for accounts added after sync has started
 - **Telegram Notifications**: Receive formatted notifications for selected operation types
 - **REST API**: Full-featured API for querying operation history
 - **Web Interface**: Modern React-based UI with pagination and filtering
@@ -13,11 +14,12 @@ A comprehensive system for monitoring Steem blockchain operations for tracked ac
 
 ## Architecture
 
-The system consists of three main components:
+The system consists of four main components:
 
 1. **Sync Service** (`cmd/sync`): Syncs blockchain data and stores it in MongoDB
-2. **API Service** (`cmd/api`): Provides REST API endpoints for the web frontend
-3. **Web Frontend** (`web/`): React application built with Vite, Tailwind CSS, and shadcn/ui
+2. **Compensator Tool** (`cmd/compensator`): Fetches historical operations for specific accounts within a block range
+3. **API Service** (`cmd/api`): Provides REST API endpoints for the web frontend
+4. **Web Frontend** (`web/`): React application built with Vite, Tailwind CSS, and shadcn/ui
 
 All services run in a single Docker container managed by supervisord.
 
@@ -63,6 +65,9 @@ go build -o sync ./cmd/sync
 
 # Build API service
 go build -o api ./cmd/api
+
+# Build compensator tool
+go build -o compensator ./cmd/compensator
 ```
 
 #### Frontend
@@ -126,6 +131,38 @@ go run cmd/sync/main.go -config configs/config.temp.yaml
 go run cmd/api/main.go -config configs/config.yaml
 ```
 
+### Using Compensator Tool
+
+The compensator tool is used to fetch historical operations for accounts that were added to tracking after the sync service has already been running. This fills the gap for operations that occurred before the account was added to the tracking list.
+
+**Usage:**
+
+```bash
+./compensator -account <account_name> -start <start_block> -end <end_block> <config_file>
+```
+
+**Example:**
+
+```bash
+./compensator -account burndao.burn -start 101777000 -end 101780000 configs/config.yaml
+```
+
+**Parameters:**
+- `-account`: The account name to fetch operations for (required)
+- `-start`: Starting block number (required, must be > 0)
+- `-end`: Ending block number (required, must be > 0, must be >= start)
+- `config_file`: Path to configuration file (required, positional argument)
+
+**What it does:**
+1. Loads configuration from the specified YAML file
+2. Connects to Steem API using `steem.api_url` from config
+3. Connects to MongoDB using `mongodb.uri` and `mongodb.database` from config
+4. Fetches blocks from `start` to `end` in batches (using `steem.batch_size` from config)
+5. Extracts and stores all operations for the specified account in that range
+6. Uses upsert to prevent duplicate operations
+
+**Note:** The compensator does not update sync state or send Telegram notifications, as it's designed for historical data only.
+
 ### Resetting Sync State
 
 If you need to restart synchronization from a specific block height, you can clear the sync state:
@@ -158,6 +195,7 @@ After clearing the sync state, restart the sync service with your desired config
 sps-fund-watcher/
 ├── cmd/
 │   ├── sync/          # Sync service entry point
+│   ├── compensator/   # Compensator tool entry point
 │   └── api/            # API service entry point
 ├── internal/
 │   ├── sync/           # Sync service logic
