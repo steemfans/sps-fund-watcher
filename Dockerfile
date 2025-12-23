@@ -1,5 +1,5 @@
 # Build stage for Go services
-FROM golang:1.21-alpine3.19 AS go-builder
+FROM golang:1.23-alpine3.19 AS go-builder
 
 WORKDIR /build
 
@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api
 FROM node:20-alpine3.19 AS frontend-builder
 
 # Install pnpm using npm (more stable than corepack)
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm
 
 WORKDIR /build
 
