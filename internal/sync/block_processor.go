@@ -138,29 +138,388 @@ func (bp *BlockProcessor) ProcessBlock(ctx context.Context, block *protocolapi.B
 
 // extractAccounts extracts account names from operation data
 // Returns a slice of accounts involved in the operation
+// Based on operation definitions in steemutil/protocol/operations.go
 func (bp *BlockProcessor) extractAccounts(opType string, opData map[string]interface{}) []string {
 	var accounts []string
 
-	// Try common account fields
-	if account, ok := opData["account"].(string); ok {
-		accounts = append(accounts, account)
-	}
-	if account, ok := opData["owner"].(string); ok {
-		accounts = append(accounts, account)
+	// Helper function to safely extract string field
+	extractString := func(field string) string {
+		if val, ok := opData[field].(string); ok && val != "" {
+			return val
+		}
+		return ""
 	}
 
-	// For transfer operations, include both from and to
-	if opType == "transfer" {
-		if from, ok := opData["from"].(string); ok {
+	// Extract accounts based on operation type
+	switch opType {
+	case "vote":
+		if voter := extractString("voter"); voter != "" {
+			accounts = append(accounts, voter)
+		}
+		if author := extractString("author"); author != "" {
+			accounts = append(accounts, author)
+		}
+
+	case "comment":
+		if parentAuthor := extractString("parent_author"); parentAuthor != "" {
+			accounts = append(accounts, parentAuthor)
+		}
+		if author := extractString("author"); author != "" {
+			accounts = append(accounts, author)
+		}
+
+	case "transfer":
+		if from := extractString("from"); from != "" {
 			accounts = append(accounts, from)
 		}
-		if to, ok := opData["to"].(string); ok {
+		if to := extractString("to"); to != "" {
 			accounts = append(accounts, to)
 		}
-	} else {
-		// For other operations, try from field
-		if account, ok := opData["from"].(string); ok {
+
+	case "transfer_to_vesting":
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+		if to := extractString("to"); to != "" {
+			accounts = append(accounts, to)
+		}
+
+	case "withdraw_vesting":
+		if account := extractString("account"); account != "" {
 			accounts = append(accounts, account)
+		}
+
+	case "limit_order_create":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "limit_order_cancel":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "feed_publish":
+		if publisher := extractString("publisher"); publisher != "" {
+			accounts = append(accounts, publisher)
+		}
+
+	case "convert":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "account_create":
+		if creator := extractString("creator"); creator != "" {
+			accounts = append(accounts, creator)
+		}
+		if newAccountName := extractString("new_account_name"); newAccountName != "" {
+			accounts = append(accounts, newAccountName)
+		}
+
+	case "account_update":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+
+	case "witness_update":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "account_witness_vote":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+		if witness := extractString("witness"); witness != "" {
+			accounts = append(accounts, witness)
+		}
+
+	case "account_witness_proxy":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+		if proxy := extractString("proxy"); proxy != "" {
+			accounts = append(accounts, proxy)
+		}
+
+	case "delete_comment":
+		if author := extractString("author"); author != "" {
+			accounts = append(accounts, author)
+		}
+
+	case "comment_options":
+		if author := extractString("author"); author != "" {
+			accounts = append(accounts, author)
+		}
+
+	case "set_withdraw_vesting_route":
+		if fromAccount := extractString("from_account"); fromAccount != "" {
+			accounts = append(accounts, fromAccount)
+		}
+		if toAccount := extractString("to_account"); toAccount != "" {
+			accounts = append(accounts, toAccount)
+		}
+
+	case "limit_order_create2":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "claim_account":
+		if creator := extractString("creator"); creator != "" {
+			accounts = append(accounts, creator)
+		}
+
+	case "create_claimed_account":
+		if creator := extractString("creator"); creator != "" {
+			accounts = append(accounts, creator)
+		}
+		if newAccountName := extractString("new_account_name"); newAccountName != "" {
+			accounts = append(accounts, newAccountName)
+		}
+
+	case "request_account_recovery":
+		if recoveryAccount := extractString("recovery_account"); recoveryAccount != "" {
+			accounts = append(accounts, recoveryAccount)
+		}
+		if accountToRecover := extractString("account_to_recover"); accountToRecover != "" {
+			accounts = append(accounts, accountToRecover)
+		}
+
+	case "recover_account":
+		if accountToRecover := extractString("account_to_recover"); accountToRecover != "" {
+			accounts = append(accounts, accountToRecover)
+		}
+
+	case "change_recovery_account":
+		if accountToRecover := extractString("account_to_recover"); accountToRecover != "" {
+			accounts = append(accounts, accountToRecover)
+		}
+		if newRecoveryAccount := extractString("new_recovery_account"); newRecoveryAccount != "" {
+			accounts = append(accounts, newRecoveryAccount)
+		}
+
+	case "escrow_transfer":
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+		if to := extractString("to"); to != "" {
+			accounts = append(accounts, to)
+		}
+		if agent := extractString("agent"); agent != "" {
+			accounts = append(accounts, agent)
+		}
+
+	case "escrow_dispute":
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+		if to := extractString("to"); to != "" {
+			accounts = append(accounts, to)
+		}
+		if agent := extractString("agent"); agent != "" {
+			accounts = append(accounts, agent)
+		}
+		if who := extractString("who"); who != "" {
+			accounts = append(accounts, who)
+		}
+
+	case "escrow_release":
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+		if to := extractString("to"); to != "" {
+			accounts = append(accounts, to)
+		}
+		if agent := extractString("agent"); agent != "" {
+			accounts = append(accounts, agent)
+		}
+		if who := extractString("who"); who != "" {
+			accounts = append(accounts, who)
+		}
+		if receiver := extractString("receiver"); receiver != "" {
+			accounts = append(accounts, receiver)
+		}
+
+	case "escrow_approve":
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+		if to := extractString("to"); to != "" {
+			accounts = append(accounts, to)
+		}
+		if agent := extractString("agent"); agent != "" {
+			accounts = append(accounts, agent)
+		}
+		if who := extractString("who"); who != "" {
+			accounts = append(accounts, who)
+		}
+
+	case "transfer_to_savings":
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+		if to := extractString("to"); to != "" {
+			accounts = append(accounts, to)
+		}
+
+	case "transfer_from_savings":
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+		if to := extractString("to"); to != "" {
+			accounts = append(accounts, to)
+		}
+
+	case "cancel_transfer_from_savings":
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+
+	case "decline_voting_rights":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+
+	case "reset_account":
+		if resetAccount := extractString("reset_account"); resetAccount != "" {
+			accounts = append(accounts, resetAccount)
+		}
+		if accountToReset := extractString("account_to_reset"); accountToReset != "" {
+			accounts = append(accounts, accountToReset)
+		}
+
+	case "set_reset_account":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+		if currentResetAccount := extractString("current_reset_account"); currentResetAccount != "" {
+			accounts = append(accounts, currentResetAccount)
+		}
+		if resetAccount := extractString("reset_account"); resetAccount != "" {
+			accounts = append(accounts, resetAccount)
+		}
+
+	case "claim_reward_balance":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+
+	case "delegate_vesting_shares":
+		if delegator := extractString("delegator"); delegator != "" {
+			accounts = append(accounts, delegator)
+		}
+		if delegatee := extractString("delegatee"); delegatee != "" {
+			accounts = append(accounts, delegatee)
+		}
+
+	case "account_create_with_delegation":
+		if creator := extractString("creator"); creator != "" {
+			accounts = append(accounts, creator)
+		}
+		if newAccountName := extractString("new_account_name"); newAccountName != "" {
+			accounts = append(accounts, newAccountName)
+		}
+
+	case "witness_set_properties":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "account_update2":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+
+	case "create_proposal":
+		if creator := extractString("creator"); creator != "" {
+			accounts = append(accounts, creator)
+		}
+		if receiver := extractString("receiver"); receiver != "" {
+			accounts = append(accounts, receiver)
+		}
+
+	case "update_proposal_votes":
+		if voter := extractString("voter"); voter != "" {
+			accounts = append(accounts, voter)
+		}
+
+	case "remove_proposal":
+		if proposalOwner := extractString("proposal_owner"); proposalOwner != "" {
+			accounts = append(accounts, proposalOwner)
+		}
+
+	case "claim_reward_balance2":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+
+	case "vote2":
+		if voter := extractString("voter"); voter != "" {
+			accounts = append(accounts, voter)
+		}
+		if author := extractString("author"); author != "" {
+			accounts = append(accounts, author)
+		}
+
+	case "fill_convert_request":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "comment_reward":
+		if author := extractString("author"); author != "" {
+			accounts = append(accounts, author)
+		}
+
+	case "liquidity_reward":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "interest":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "fill_vesting_withdraw":
+		if fromAccount := extractString("from_account"); fromAccount != "" {
+			accounts = append(accounts, fromAccount)
+		}
+		if toAccount := extractString("to_account"); toAccount != "" {
+			accounts = append(accounts, toAccount)
+		}
+
+	case "fill_order":
+		if currentOwner := extractString("current_owner"); currentOwner != "" {
+			accounts = append(accounts, currentOwner)
+		}
+		if openOwner := extractString("open_owner"); openOwner != "" {
+			accounts = append(accounts, openOwner)
+		}
+
+	case "fill_transfer_from_savings":
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+		if to := extractString("to"); to != "" {
+			accounts = append(accounts, to)
+		}
+
+	default:
+		// Fallback: try common account fields for unknown operation types
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+		if from := extractString("from"); from != "" {
+			accounts = append(accounts, from)
+		}
+		if to := extractString("to"); to != "" {
+			accounts = append(accounts, to)
 		}
 	}
 
@@ -168,7 +527,7 @@ func (bp *BlockProcessor) extractAccounts(opType string, opData map[string]inter
 	accountMap := make(map[string]bool)
 	var uniqueAccounts []string
 	for _, acc := range accounts {
-		if !accountMap[acc] {
+		if acc != "" && !accountMap[acc] {
 			accountMap[acc] = true
 			uniqueAccounts = append(uniqueAccounts, acc)
 		}
