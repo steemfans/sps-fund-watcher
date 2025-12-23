@@ -16,6 +16,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o sync ./cmd/sync
 # Build API service
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api
 
+# Build compensator tool
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o compensator ./cmd/compensator
+
 # Build stage for frontend
 FROM node:20-alpine3.19 AS frontend-builder
 
@@ -50,6 +53,7 @@ WORKDIR /app
 # Copy Go binaries from builder
 COPY --from=go-builder /build/sync /app/sync
 COPY --from=go-builder /build/api /app/api
+COPY --from=go-builder /build/compensator /app/compensator
 
 # Copy frontend build from builder
 COPY --from=frontend-builder /build/dist /app/web/dist
