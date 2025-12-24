@@ -104,24 +104,27 @@ func main() {
 			batchEnd = *endBlock
 		}
 
-		log.Printf("Fetching blocks %d to %d...", currentBlock, batchEnd)
+		log.Printf("Fetching operations for blocks %d to %d...", currentBlock, batchEnd)
 
-		// Get blocks in batch (GetBlocks to parameter is exclusive, so we use batchEnd+1)
-		wrapBlocks, err := steemAPI.GetBlocks(uint(currentBlock), uint(batchEnd+1))
+		// Get all operations (both regular and virtual) in batch using GetOpsInBlocks
+		// This is more efficient than calling GetBlocks + GetOpsInBlocks separately
+		opsMap, err := steemAPI.GetOpsInBlocks(uint(currentBlock), uint(batchEnd+1), false)
 		if err != nil {
-			log.Fatalf("Failed to get blocks %d to %d: %v", currentBlock, batchEnd, err)
+			log.Fatalf("Failed to get operations for blocks %d to %d: %v", currentBlock, batchEnd, err)
 		}
-
-		log.Printf("Processing %d blocks in batch...", len(wrapBlocks))
+		log.Printf("Retrieved operations for %d blocks", len(opsMap))
 
 		// Process each block in the batch
-		for _, wrapBlock := range wrapBlocks {
-			blockNum := int64(wrapBlock.BlockNum)
+		for i := currentBlock; i <= batchEnd; i++ {
+			blockNum := int64(i)
 
-			// Process block to extract operations for the target account
-			operations, err := processor.ProcessBlock(ctx, wrapBlock.Block, blockNum)
-			if err != nil {
-				log.Fatalf("Failed to process block %d: %v", blockNum, err)
+			// Process all operations (regular + virtual) for this block
+			var operations []*models.Operation
+			if ops, ok := opsMap[uint(blockNum)]; ok && len(ops) > 0 {
+				operations, err = processor.ProcessOperations(ctx, ops)
+				if err != nil {
+					log.Fatalf("Failed to process operations for block %d: %v", blockNum, err)
+				}
 			}
 
 			// Store operations (InsertOperations handles duplicates via upsert)
@@ -130,7 +133,7 @@ func main() {
 					log.Fatalf("Failed to insert operations for block %d: %v", blockNum, err)
 				}
 				totalOperations += len(operations)
-				log.Printf("Block %d: saved %d operations", blockNum, len(operations))
+				log.Printf("Block %d: saved %d operations (regular + virtual)", blockNum, len(operations))
 			}
 
 			processedBlocks++

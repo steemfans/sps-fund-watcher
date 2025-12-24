@@ -4,7 +4,7 @@ go 1.23.0
 
 require (
 	github.com/gin-gonic/gin v1.11.0
-	github.com/steemit/steemgosdk v0.0.10
+	github.com/steemit/steemgosdk v0.0.11
 	github.com/steemit/steemutil v0.0.13
 	go.mongodb.org/mongo-driver v1.17.6
 	gopkg.in/yaml.v3 v3.0.1

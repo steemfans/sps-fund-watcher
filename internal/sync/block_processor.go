@@ -9,6 +9,7 @@ import (
 	"github.com/ety001/sps-fund-watcher/internal/models"
 	"github.com/ety001/sps-fund-watcher/internal/storage"
 	"github.com/ety001/sps-fund-watcher/internal/telegram"
+	"github.com/steemit/steemutil/protocol"
 	protocolapi "github.com/steemit/steemutil/protocol/api"
 )
 
@@ -134,6 +135,92 @@ func (bp *BlockProcessor) ProcessBlock(ctx context.Context, block *protocolapi.B
 	}
 
 	return operations, nil
+}
+
+// ProcessOperations processes operations from OperationObject array
+// and extracts operations for tracked accounts. This handles both regular and virtual operations.
+func (bp *BlockProcessor) ProcessOperations(ctx context.Context, ops []*protocol.OperationObject) ([]*models.Operation, error) {
+	var operations []*models.Operation
+
+	for _, opObj := range ops {
+		// Parse timestamp from OperationObject
+		var opTime time.Time
+		if opObj.Timestamp != nil && opObj.Timestamp.Time != nil {
+			opTime = *opObj.Timestamp.Time
+		} else {
+			opTime = time.Now()
+		}
+
+		// Get operation type and data
+		opType := string(opObj.Operation.Type())
+
+		// Convert operation data to map[string]interface{}
+		opDataRaw := opObj.Operation.Data()
+		var opData map[string]interface{}
+
+		// Try to convert to map
+		if dataMap, ok := opDataRaw.(map[string]interface{}); ok {
+			opData = dataMap
+		} else {
+			// If it's a typed operation, marshal and unmarshal to get map
+			dataJSON, err := json.Marshal(opDataRaw)
+			if err != nil {
+				continue
+			}
+			if err := json.Unmarshal(dataJSON, &opData); err != nil {
+				continue
+			}
+		}
+
+		// Extract accounts from operation data
+		accounts := bp.extractAccounts(opType, opData)
+		if len(accounts) == 0 {
+			continue
+		}
+
+		// Create operation for each tracked account
+		for _, account := range accounts {
+			// Check if account is tracked
+			if !bp.accounts[account] {
+				continue
+			}
+
+			// For virtual operations, TransactionID is usually empty
+			// Use a combination of block number and virtual op number as unique identifier
+			trxID := opObj.TransactionID
+			if trxID == "" {
+				if opObj.VirtualOperation > 0 {
+					// Virtual operation: use virtual op number as identifier
+					trxID = fmt.Sprintf("virtual_%d_%d", opObj.BlockNumber, opObj.VirtualOperation)
+				} else {
+					// Regular operation with empty TransactionID (should not happen, but handle gracefully)
+					// Use transaction_in_block and op_in_trx as fallback identifier
+					trxID = fmt.Sprintf("regular_%d_%d_%d", opObj.BlockNumber, opObj.TransactionInBlock, opObj.OperationInTransaction)
+				}
+			}
+
+			// Create operation model
+			op := &models.Operation{
+				BlockNum:  int64(opObj.BlockNumber),
+				TrxID:     trxID,
+				OpInTrx:   int(opObj.OperationInTransaction),
+				Account:   account,
+				OpType:    opType,
+				OpData:    opData,
+				Timestamp: opTime,
+			}
+
+			operations = append(operations, op)
+		}
+	}
+
+	return operations, nil
+}
+
+// ProcessVirtualOperations is kept for backward compatibility
+// It now delegates to ProcessOperations
+func (bp *BlockProcessor) ProcessVirtualOperations(ctx context.Context, ops []*protocol.OperationObject, blockNum int64) ([]*models.Operation, error) {
+	return bp.ProcessOperations(ctx, ops)
 }
 
 // extractAccounts extracts account names from operation data

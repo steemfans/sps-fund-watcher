@@ -165,18 +165,19 @@ func (s *Syncer) syncBlocks(ctx context.Context, startBlock int64) error {
 		}
 		log.Printf("[DEBUG] Processing batch: blocks %d to %d (total %d blocks)", currentBlock, endBlock, endBlock-currentBlock+1)
 
-		// Get blocks in batch using GetBlocks (to is exclusive, so we use endBlock+1)
-		log.Printf("[DEBUG] Calling GetBlocks(%d, %d)", currentBlock, endBlock+1)
-		wrapBlocks, err := s.steemAPI.GetBlocks(uint(currentBlock), uint(endBlock+1))
+		// Get all operations (both regular and virtual) in batch using GetOpsInBlocks
+		// This is more efficient than calling GetBlocks + GetOpsInBlocks separately
+		log.Printf("[DEBUG] Calling GetOpsInBlocks(%d, %d, onlyVirtual=false)", currentBlock, endBlock+1)
+		opsMap, err := s.steemAPI.GetOpsInBlocks(uint(currentBlock), uint(endBlock+1), false)
 		if err != nil {
-			return fmt.Errorf("failed to get blocks %d to %d: %w", currentBlock, endBlock, err)
+			return fmt.Errorf("failed to get operations for blocks %d to %d: %w", currentBlock, endBlock, err)
 		}
-		log.Printf("[DEBUG] GetBlocks returned %d blocks", len(wrapBlocks))
+		log.Printf("[DEBUG] GetOpsInBlocks returned operations for %d blocks", len(opsMap))
 
 		// Process each block in the batch
-		for i, wrapBlock := range wrapBlocks {
-			blockNum := int64(wrapBlock.BlockNum)
-			log.Printf("[DEBUG] Processing block %d/%d in batch (blockNum=%d)", i+1, len(wrapBlocks), blockNum)
+		for i := currentBlock; i <= endBlock; i++ {
+			blockNum := int64(i)
+			log.Printf("[DEBUG] Processing block %d in batch", blockNum)
 
 			// Check current state before processing to avoid processing blocks we've already synced
 			currentState, err := s.storage.GetSyncState(ctx)
@@ -190,18 +191,23 @@ func (s *Syncer) syncBlocks(ctx context.Context, startBlock int64) error {
 				}
 			}
 
-			// Process block
-			operations, err := s.processor.ProcessBlock(ctx, wrapBlock.Block, blockNum)
-			if err != nil {
-				return fmt.Errorf("failed to process block %d: %w", blockNum, err)
+			// Process all operations (regular + virtual) for this block
+			var operations []*models.Operation
+			if ops, ok := opsMap[uint(blockNum)]; ok && len(ops) > 0 {
+				operations, err = s.processor.ProcessOperations(ctx, ops)
+				if err != nil {
+					return fmt.Errorf("failed to process operations for block %d: %w", blockNum, err)
+				}
+				log.Printf("[DEBUG] Block %d: extracted %d operations (regular + virtual)", blockNum, len(operations))
+			} else {
+				log.Printf("[DEBUG] Block %d: no operations found", blockNum)
 			}
-			log.Printf("[DEBUG] Block %d: extracted %d operations", blockNum, len(operations))
 
 			lastSyncedBlock = blockNum
 
 			// Save operations (this will also send Telegram notifications if enabled)
 			if len(operations) > 0 {
-				log.Printf("[DEBUG] Saving %d operations for block %d", len(operations), blockNum)
+				log.Printf("[DEBUG] Saving %d operations (regular + virtual) for block %d", len(operations), blockNum)
 				if err := s.processor.SaveOperations(ctx, operations); err != nil {
 					return fmt.Errorf("failed to save operations for block %d: %w", blockNum, err)
 				}
