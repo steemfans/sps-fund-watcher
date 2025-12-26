@@ -594,6 +594,57 @@ func (bp *BlockProcessor) extractAccounts(opType string, opData map[string]inter
 			accounts = append(accounts, to)
 		}
 
+	case "proposal_pay":
+		if receiver := extractString("receiver"); receiver != "" {
+			accounts = append(accounts, receiver)
+		}
+
+	case "author_reward":
+		if author := extractString("author"); author != "" {
+			accounts = append(accounts, author)
+		}
+
+	case "curation_reward":
+		if curator := extractString("curator"); curator != "" {
+			accounts = append(accounts, curator)
+		}
+		if commentAuthor := extractString("comment_author"); commentAuthor != "" {
+			accounts = append(accounts, commentAuthor)
+		}
+
+	case "shutdown_witness":
+		if owner := extractString("owner"); owner != "" {
+			accounts = append(accounts, owner)
+		}
+
+	case "comment_payout_update":
+		if author := extractString("author"); author != "" {
+			accounts = append(accounts, author)
+		}
+
+	case "return_vesting_delegation":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+
+	case "comment_benefactor_reward":
+		if benefactor := extractString("benefactor"); benefactor != "" {
+			accounts = append(accounts, benefactor)
+		}
+		if author := extractString("author"); author != "" {
+			accounts = append(accounts, author)
+		}
+
+	case "producer_reward":
+		if producer := extractString("producer"); producer != "" {
+			accounts = append(accounts, producer)
+		}
+
+	case "hardfork23":
+		if account := extractString("account"); account != "" {
+			accounts = append(accounts, account)
+		}
+
 	default:
 		// Fallback: try common account fields for unknown operation types
 		if account := extractString("account"); account != "" {
