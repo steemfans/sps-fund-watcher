@@ -42,3 +42,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Output Docker image name
+        run: |
+          echo "Docker images built and pushed:"
+          echo "${{ steps.meta.outputs.tags }}"
