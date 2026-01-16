@@ -73,13 +73,14 @@ func main() {
 
 	// Initialize block processor with only the target account
 	// Pass nil for Telegram client since we don't want notifications for historical data
+	// Use empty user configs since we don't need notifications
+	userConfigs := []models.TelegramUserConfig{} // Empty = no notification rules
 	processor := sync.NewBlockProcessor(
 		mongoStorage,
-		nil,                // No Telegram notifications
+		nil,          // No Telegram client
+		userConfigs,  // No notification rules
 		[]string{*account}, // Only track the specified account
-		nil,                // No notify operations filter
-		nil,                // No notify accounts filter
-		"",                 // No message template
+		"",           // No message template
 	)
 
 	// Process blocks

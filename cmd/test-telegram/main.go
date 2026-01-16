@@ -74,7 +74,7 @@ func main() {
 	// Print message preview
 	fmt.Println("\n=== Message Preview ===")
 	fmt.Println(message)
-	fmt.Println("======================\n")
+	fmt.Println("======================")
 
 	// Send message
 	log.Printf("Sending test message to Telegram channel %s...", config.Telegram.ChannelID)

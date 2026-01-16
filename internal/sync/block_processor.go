@@ -13,26 +13,31 @@ import (
 	protocolapi "github.com/steemit/steemutil/protocol/api"
 )
 
+// TelegramNotificationRule holds a notification rule configuration
+type TelegramNotificationRule struct {
+	Config         models.TelegramUserConfig
+	NotifyOps      map[string]bool
+	NotifyAllOps   bool
+	NotifyAccounts map[string]bool
+	NotifyAllAccts bool
+}
+
 // BlockProcessor processes blocks and extracts operations
 type BlockProcessor struct {
-	storage         *storage.MongoDB
-	telegram        *telegram.Client
-	accounts        map[string]bool
-	notifyOps       map[string]bool
-	notifyAllOps    bool
-	notifyAccounts  map[string]bool
-	notifyAllAccts  bool
-	messageTemplate string
+	storage           *storage.MongoDB
+	telegramClient    *telegram.Client
+	notificationRules []TelegramNotificationRule
+	accounts          map[string]bool
+	globalTemplate    string
 }
 
 // NewBlockProcessor creates a new block processor
 func NewBlockProcessor(
 	storage *storage.MongoDB,
-	telegram *telegram.Client,
+	telegramClient *telegram.Client,
+	userConfigs []models.TelegramUserConfig,
 	accounts []string,
-	notifyOperations []string,
-	notifyAccounts []string,
-	messageTemplate string,
+	globalMessageTemplate string,
 ) *BlockProcessor {
 	// Create account map for fast lookup
 	accountMap := make(map[string]bool)
@@ -40,33 +45,42 @@ func NewBlockProcessor(
 		accountMap[account] = true
 	}
 
-	// Create notify operations map
-	notifyOpsMap := make(map[string]bool)
-	notifyAllOps := len(notifyOperations) == 0
-	if !notifyAllOps {
-		for _, opType := range notifyOperations {
-			notifyOpsMap[opType] = true
+	// Prepare notification rules
+	var rules []TelegramNotificationRule
+	for _, userConfig := range userConfigs {
+		// Create notify operations map
+		notifyOpsMap := make(map[string]bool)
+		notifyAllOps := len(userConfig.NotifyOperations) == 0
+		if !notifyAllOps {
+			for _, opType := range userConfig.NotifyOperations {
+				notifyOpsMap[opType] = true
+			}
 		}
-	}
 
-	// Create notify accounts map
-	notifyAcctsMap := make(map[string]bool)
-	notifyAllAccts := len(notifyAccounts) == 0
-	if !notifyAllAccts {
-		for _, account := range notifyAccounts {
-			notifyAcctsMap[account] = true
+		// Create notify accounts map
+		notifyAcctsMap := make(map[string]bool)
+		notifyAllAccts := len(userConfig.Accounts) == 0
+		if !notifyAllAccts {
+			for _, account := range userConfig.Accounts {
+				notifyAcctsMap[account] = true
+			}
 		}
+
+		rules = append(rules, TelegramNotificationRule{
+			Config:         userConfig,
+			NotifyOps:      notifyOpsMap,
+			NotifyAllOps:   notifyAllOps,
+			NotifyAccounts: notifyAcctsMap,
+			NotifyAllAccts: notifyAllAccts,
+		})
 	}
 
 	return &BlockProcessor{
-		storage:         storage,
-		telegram:        telegram,
-		accounts:        accountMap,
-		notifyOps:       notifyOpsMap,
-		notifyAllOps:    notifyAllOps,
-		notifyAccounts:  notifyAcctsMap,
-		notifyAllAccts:  notifyAllAccts,
-		messageTemplate: messageTemplate,
+		storage:           storage,
+		telegramClient:    telegramClient,
+		notificationRules: rules,
+		accounts:          accountMap,
+		globalTemplate:    globalMessageTemplate,
 	}
 }
 
@@ -674,6 +688,78 @@ func (bp *BlockProcessor) extractAccounts(opType string, opData map[string]inter
 	return uniqueAccounts
 }
 
+// shouldNotifyForRule checks if an operation should be notified for a specific rule
+func (bp *BlockProcessor) shouldNotifyForRule(rule TelegramNotificationRule, op *models.Operation) bool {
+	// Check if operation type matches
+	opTypeMatches := rule.NotifyAllOps
+	if !opTypeMatches {
+		opTypeMatches = rule.NotifyOps[op.OpType]
+	}
+	if !opTypeMatches {
+		return false
+	}
+
+	// Check if account matches
+	accountMatches := rule.NotifyAllAccts
+	if !accountMatches {
+		accountMatches = rule.NotifyAccounts[op.Account]
+	}
+	if !accountMatches {
+		return false
+	}
+
+	// Check operation-level filters
+	if !bp.passesOperationFilters(rule.Config.OperationFilters, op) {
+		return false
+	}
+
+	return true
+}
+
+// passesOperationFilters checks if an operation passes all configured filters
+func (bp *BlockProcessor) passesOperationFilters(filters map[string]models.OperationFilter, op *models.Operation) bool {
+	if filters == nil {
+		return true
+	}
+
+	// Check if there's a filter for this operation type
+	filter, exists := filters[op.OpType]
+	if !exists {
+		return true
+	}
+
+	// Apply different filter logic based on opType
+	switch op.OpType {
+	case "transfer":
+		return bp.passesTransferFilter(filter, op.OpData)
+	default:
+		return true
+	}
+}
+
+// passesTransferFilter checks if a transfer operation passes the filter
+func (bp *BlockProcessor) passesTransferFilter(filter models.OperationFilter, opData map[string]interface{}) bool {
+	// If no whitelist configured, pass all checks
+	if len(filter.IgnoreToAddresses) == 0 {
+		return true
+	}
+
+	// Check if recipient is in whitelist
+	toAddr, ok := opData["to"].(string)
+	if !ok {
+		return true
+	}
+
+	// If recipient is in whitelist, return false (don't notify)
+	for _, ignoreAddr := range filter.IgnoreToAddresses {
+		if toAddr == ignoreAddr {
+			return false
+		}
+	}
+
+	return true
+}
+
 // SaveOperations saves operations to storage and sends notifications
 func (bp *BlockProcessor) SaveOperations(ctx context.Context, operations []*models.Operation) error {
 	if len(operations) == 0 {
@@ -685,28 +771,31 @@ func (bp *BlockProcessor) SaveOperations(ctx context.Context, operations []*mode
 		return fmt.Errorf("failed to insert operations: %w", err)
 	}
 
-	// Send Telegram notifications for matching operations
-	// Only notify if both account and operation type match the filters
-	if bp.telegram != nil {
-		for _, op := range operations {
-			// Check if operation type matches
-			opTypeMatches := bp.notifyAllOps
-			if !opTypeMatches {
-				opTypeMatches = bp.notifyOps[op.OpType]
-			}
+	// Send Telegram notifications for each configured rule
+	if bp.telegramClient != nil {
+		for _, rule := range bp.notificationRules {
+			for _, op := range operations {
+				// Check if should notify for this rule
+				if !bp.shouldNotifyForRule(rule, op) {
+					continue
+				}
 
-			// Check if account matches
-			accountMatches := bp.notifyAllAccts
-			if !accountMatches {
-				accountMatches = bp.notifyAccounts[op.Account]
-			}
-
-			// Only notify if both conditions are met
-			if opTypeMatches && accountMatches {
+				// Format message
 				var message string
-				if bp.messageTemplate != "" {
+				if rule.Config.MessageTemplate != "" {
+					// Use rule-specific template
 					message = telegram.FormatOperationMessageWithTemplate(
-						bp.messageTemplate,
+						rule.Config.MessageTemplate,
+						op.Account,
+						op.OpType,
+						op.OpData,
+						op.BlockNum,
+						op.Timestamp,
+					)
+				} else if bp.globalTemplate != "" {
+					// Use global template
+					message = telegram.FormatOperationMessageWithTemplate(
+						bp.globalTemplate,
 						op.Account,
 						op.OpType,
 						op.OpData,
@@ -714,6 +803,7 @@ func (bp *BlockProcessor) SaveOperations(ctx context.Context, operations []*mode
 						op.Timestamp,
 					)
 				} else {
+					// Use default format
 					message = telegram.FormatOperationMessage(
 						op.Account,
 						op.OpType,
@@ -723,9 +813,9 @@ func (bp *BlockProcessor) SaveOperations(ctx context.Context, operations []*mode
 					)
 				}
 
-				if err := bp.telegram.SendMessage(message); err != nil {
-					// Log error but don't fail the sync
-					fmt.Printf("Failed to send Telegram notification: %v\n", err)
+				if err := bp.telegramClient.SendMessage(message); err != nil {
+					fmt.Printf("Failed to send Telegram notification for rule %s: %v\n",
+						rule.Config.Name, err)
 				}
 			}
 		}

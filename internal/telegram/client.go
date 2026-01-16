@@ -12,10 +12,10 @@ import (
 
 // Client represents a Telegram bot client
 type Client struct {
-	botToken  string
-	channelID string
+	botToken   string
+	channelID  string
 	httpClient *http.Client
-	apiURL    string
+	apiURL     string
 }
 
 // NewClient creates a new Telegram bot client
@@ -92,7 +92,7 @@ func (c *Client) SendMessage(text string) error {
 func FormatOperationMessage(account, opType string, opData map[string]interface{}, blockNum int64, timestamp time.Time) string {
 	var builder strings.Builder
 
-	builder.WriteString(fmt.Sprintf("<b>🔔 New Operation</b>\n\n"))
+	fmt.Fprintf(&builder, "<b>🔔 New Operation</b>\n\n")
 	builder.WriteString(fmt.Sprintf("<b>Account:</b> <code>%s</code>\n", account))
 	builder.WriteString(fmt.Sprintf("<b>Type:</b> <code>%s</code>\n", opType))
 	builder.WriteString(fmt.Sprintf("<b>Block:</b> <code>%d</code>\n", blockNum))
@@ -100,18 +100,16 @@ func FormatOperationMessage(account, opType string, opData map[string]interface{
 
 	// Format operation-specific data
 	builder.WriteString("<b>Details:</b>\n")
-	if opData != nil {
-		for key, value := range opData {
-			// Skip internal fields
-			if key == "memo" || key == "json_metadata" {
-				continue
-			}
-			valueStr := fmt.Sprintf("%v", value)
-			if len(valueStr) > 100 {
-				valueStr = valueStr[:100] + "..."
-			}
-			builder.WriteString(fmt.Sprintf("  • <b>%s:</b> <code>%s</code>\n", key, escapeHTML(valueStr)))
+	for key, value := range opData {
+		// Skip internal fields
+		if key == "memo" || key == "json_metadata" {
+			continue
 		}
+		valueStr := fmt.Sprintf("%v", value)
+		if len(valueStr) > 100 {
+			valueStr = valueStr[:100] + "..."
+		}
+		fmt.Fprintf(&builder, "  • <b>%s:</b> <code>%s</code>\n", key, escapeHTML(valueStr))
 	}
 
 	return builder.String()
@@ -127,18 +125,16 @@ func FormatOperationMessage(account, opType string, opData map[string]interface{
 func FormatOperationMessageWithTemplate(template string, account, opType string, opData map[string]interface{}, blockNum int64, timestamp time.Time) string {
 	// Format details
 	var detailsBuilder strings.Builder
-	if opData != nil {
-		for key, value := range opData {
-			// Skip internal fields
-			if key == "memo" || key == "json_metadata" {
-				continue
-			}
-			valueStr := fmt.Sprintf("%v", value)
-			if len(valueStr) > 100 {
-				valueStr = valueStr[:100] + "..."
-			}
-			detailsBuilder.WriteString(fmt.Sprintf("  • <b>%s:</b> <code>%s</code>\n", key, escapeHTML(valueStr)))
+	for key, value := range opData {
+		// Skip internal fields
+		if key == "memo" || key == "json_metadata" {
+			continue
 		}
+		valueStr := fmt.Sprintf("%v", value)
+		if len(valueStr) > 100 {
+			valueStr = valueStr[:100] + "..."
+		}
+		fmt.Fprintf(&detailsBuilder, "  • <b>%s:</b> <code>%s</code>\n", key, escapeHTML(valueStr))
 	}
 	details := detailsBuilder.String()
 	if details == "" {
@@ -180,4 +176,3 @@ func ShouldNotify(opType string, notifyOperations []string) bool {
 
 	return false
 }
-

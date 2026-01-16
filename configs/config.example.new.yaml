@@ -1,0 +1,81 @@
+# 新的多规则 Telegram 配置示例
+# 此配置文件展示了如何使用新的多规则配置格式
+
+steem:
+  api_url: "https://api.steem.fans"
+  start_block: 101777000
+  batch_size: 100
+  accounts:
+    - "burndao.burn"
+
+mongodb:
+  uri: "mongodb://mongo:27017"
+  database: "sps_fund_watcher"
+
+telegram:
+  enabled: true
+
+  # 全局配置（所有规则共享）
+  bot_token: "your_bot_token_here"
+  channel_id: "your_channel_id_here"
+
+  # 全局消息模板（当规则没有配置自己的模板时使用）
+  message_template: |
+    🔔 <b>New Operation</b>
+
+    <b>Account:</b> <code>{{.Account}}</code>
+    <b>Type:</b> <code>{{.OpType}}</code>
+    <b>Block:</b> <code>{{.BlockNum}}</code>
+    <b>Time:</b> <code>{{.Timestamp}}</code>
+
+    <b>Details:</b>
+    {{.Details}}
+
+  # 新格式：支持多个通知规则配置
+  users:
+    # 规则1：监控 burndao.burn 的 transfer 和 account_update
+    # 当转账给交易所账户时，不发送通知
+    - name: "main-account-monitor"
+      accounts:
+        - "burndao.burn"
+      notify_operations:
+        - "transfer"
+        - "account_update"
+      operation_filters:
+        transfer:
+          # 白名单：转账到这些地址时不发送通知
+          ignore_to_addresses:
+            - "exchange.account"
+            - "savings.account"
+            - "bittrex"
+            - "poloniex"
+
+    # 规则2：监控所有账户的所有操作
+    # 没有白名单过滤，所有通知都发送
+    - name: "all-operations-monitor"
+      accounts: []  # 空表示关注所有追踪的账户
+      notify_operations: []  # 空表示通知所有操作类型
+      operation_filters: {}  # 没有过滤器
+
+    # 规则3：只监控特定账户的投票操作
+    # 使用自定义消息模板
+    - name: "vote-monitor"
+      accounts:
+        - "burndao.burn"
+        - "another.account"
+      notify_operations:
+        - "vote"
+      operation_filters: {}
+      # 自定义消息模板（会覆盖全局模板）
+      message_template: |
+        🗳️ <b>New Vote Detected</b>
+
+        <b>Voter:</b> <code>{{.Account}}</code>
+        <b>Block:</b> <code>{{.BlockNum}}</code>
+
+        <b>Details:</b>
+        {{.Details}}
+
+api:
+  port: "8080"
+  host: "0.0.0.0"

@@ -40,6 +40,18 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
+	// Log Telegram configuration format
+	telegramUsers, useNewFormat := models.NormalizeTelegramConfig(&config.Telegram)
+	if useNewFormat {
+		log.Printf("Using new multi-rule Telegram configuration with %d rules", len(telegramUsers))
+		for i, user := range telegramUsers {
+			log.Printf("  Rule %d: name=%s, accounts=%v, operations=%v, filters=%v",
+				i+1, user.Name, user.Accounts, user.NotifyOperations, user.OperationFilters)
+		}
+	} else {
+		log.Printf("Using legacy Telegram configuration (converted to 1 rule)")
+	}
+
 	// Create syncer
 	syncer, err := sync.NewSyncer(config)
 	if err != nil {

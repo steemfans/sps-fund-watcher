@@ -7,7 +7,11 @@ A comprehensive system for monitoring Steem blockchain operations for tracked ac
 - **Blockchain Sync Service**: Continuously syncs Steem blockchain data from a configured block height to the latest irreversible block
 - **Account Tracking**: Monitor specific Steem accounts for all operations
 - **Compensator Tool**: Fetch historical operations for accounts added after sync has started
-- **Telegram Notifications**: Receive formatted notifications for selected operation types
+- **Telegram Notifications**: Receive formatted notifications for selected operation types with advanced filtering:
+  - **Multi-Rule Configuration**: Configure multiple notification rules with different filters
+  - **Transfer Whitelist**: Ignore transfers to specific addresses (e.g., exchanges, savings)
+  - **Custom Templates**: Use global or rule-specific message templates
+  - **Backward Compatible**: Legacy configuration format still supported
 - **REST API**: Full-featured API for querying operation history
 - **Web Interface**: Modern React-based UI with pagination and filtering
 - **Docker Deployment**: Single container deployment with supervisord and nginx
@@ -27,10 +31,13 @@ All services run in a single Docker container managed by supervisord.
 
 Edit `configs/config.yaml` to configure:
 
+### Basic Configuration
+
 ```yaml
 steem:
   api_url: "https://api.steem.fans"  # Steem API endpoint
   start_block: 50000000              # Starting block height
+  batch_size: 100                    # Number of blocks to fetch per batch
   accounts:
     - "burndao.burn"                 # Accounts to track
 
@@ -38,20 +45,124 @@ mongodb:
   uri: "mongodb://localhost:27017"   # MongoDB connection string
   database: "sps_fund_watcher"        # Database name
 
-telegram:
-  enabled: true                       # Enable Telegram notifications
-  bot_token: ""                       # Telegram bot token
-  channel_id: ""                      # Telegram channel ID
-  notify_operations:                  # Operation types to notify
-    - "transfer"
-    - "account_update"
-    - "account_update2"
-    # Empty list means notify all operations
-
 api:
   port: "8080"                        # API server port
   host: "0.0.0.0"                     # API server host
 ```
+
+### Telegram Configuration (Legacy Format - Still Supported)
+
+```yaml
+telegram:
+  enabled: true                       # Enable Telegram notifications
+  bot_token: "your_bot_token"         # Telegram bot token
+  channel_id: "your_channel_id"       # Telegram channel ID
+  accounts:                           # Accounts to notify (empty = all tracked)
+    - "burndao.burn"
+  notify_operations:                  # Operation types to notify
+    - "transfer"
+    - "account_update"
+    # Empty list means notify all operations
+  message_template: |                 # Optional custom message template
+    🔔 <b>New Operation</b>
+    <b>Account:</b> <code>{{.Account}}</code>
+    <b>Type:</b> <code>{{.OpType}}</code>
+    <b>Details:</b>
+    {{.Details}}
+```
+
+### Telegram Configuration (New Multi-Rule Format)
+
+The new format supports multiple notification rules with advanced filtering:
+
+```yaml
+telegram:
+  enabled: true
+  bot_token: "your_bot_token"         # Global bot token (shared by all rules)
+  channel_id: "your_channel_id"       # Global channel ID (shared by all rules)
+
+  # Global message template (used when rule doesn't have its own)
+  message_template: |
+    🔔 <b>New Operation</b>
+
+    <b>Account:</b> <code>{{.Account}}</code>
+    <b>Type:</b> <code>{{.OpType}}</code>
+    <b>Block:</b> <code>{{.BlockNum}}</code>
+    <b>Time:</b> <code>{{.Timestamp}}</code>
+
+    <b>Details:</b>
+    {{.Details}}
+
+  # Multiple notification rules
+  users:
+    # Rule 1: Monitor transfers with whitelist filtering
+    - name: "main-account-monitor"
+      accounts:
+        - "burndao.burn"
+      notify_operations:
+        - "transfer"
+        - "account_update"
+      operation_filters:
+        transfer:
+          # Whitelist: don't notify when transferring to these addresses
+          ignore_to_addresses:
+            - "exchange.account"
+            - "savings.account"
+            - "bittrex"
+            - "poloniex"
+
+    # Rule 2: Monitor all operations for all accounts
+    - name: "all-operations-monitor"
+      accounts: []                    # Empty = all tracked accounts
+      notify_operations: []            # Empty = all operation types
+      operation_filters: {}            # No filters
+
+    # Rule 3: Vote monitoring with custom template
+    - name: "vote-monitor"
+      accounts:
+        - "burndao.burn"
+        - "another.account"
+      notify_operations:
+        - "vote"
+      operation_filters: {}
+      message_template: |              # Rule-specific template
+        🗳️ <b>New Vote Detected</b>
+
+        <b>Voter:</b> <code>{{.Account}}</code>
+        <b>Block:</b> <code>{{.BlockNum}}</code>
+
+        <b>Details:</b>
+        {{.Details}}
+```
+
+#### Configuration Options
+
+**Global Settings:**
+- `enabled`: Enable/disable Telegram notifications
+- `bot_token`: Telegram bot token (required for all rules)
+- `channel_id`: Telegram channel ID (required for all rules)
+- `message_template`: Fallback template used when rules don't define their own
+
+**Rule Settings (each rule in `users` array):**
+- `name`: Rule identifier (for logging)
+- `accounts`: List of accounts to monitor (empty = all tracked accounts)
+- `notify_operations`: List of operation types to notify (empty = all types)
+- `operation_filters`: Operation-specific filters
+  - `transfer.ignore_to_addresses`: Whitelist of addresses to ignore
+- `message_template`: Optional rule-specific template (overrides global)
+
+#### Template Variables
+
+Available variables in message templates:
+- `{{.Account}}`: Account name
+- `{{.OpType}}`: Operation type
+- `{{.BlockNum}}`: Block number
+- `{{.Timestamp}}`: Operation timestamp
+- `{{.Details}}`: Formatted operation details
+
+#### Backward Compatibility
+
+The legacy configuration format is still fully supported. If the `users` field is empty or not present, the system will automatically convert the legacy format to a single rule named "default".
 
 ## Building
 

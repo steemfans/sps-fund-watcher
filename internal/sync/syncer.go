@@ -41,20 +41,22 @@ func NewSyncer(config *models.Config) (*Syncer, error) {
 		log.Printf("Warning: failed to create indexes: %v", err)
 	}
 
-	// Initialize Telegram client if enabled
+	// Initialize Telegram client if enabled (using global config)
 	var tgClient *telegram.Client
 	if config.Telegram.Enabled && config.Telegram.BotToken != "" && config.Telegram.ChannelID != "" {
 		tgClient = telegram.NewClient(config.Telegram.BotToken, config.Telegram.ChannelID)
 	}
 
-	// Initialize block processor
+	// Normalize Telegram config (convert old format to new format if needed)
+	userConfigs, _ := models.NormalizeTelegramConfig(&config.Telegram)
+
+	// Initialize block processor with user configs
 	processor := NewBlockProcessor(
 		mongoStorage,
 		tgClient,
+		userConfigs,
 		config.Steem.Accounts,
-		config.Telegram.NotifyOperations,
-		config.Telegram.Accounts,
-		config.Telegram.MessageTemplate,
+		config.Telegram.MessageTemplate, // Global fallback template
 	)
 
 	return &Syncer{
