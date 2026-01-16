@@ -156,7 +156,7 @@ func (bp *BlockProcessor) ProcessBlock(ctx context.Context, block *protocolapi.B
 func (bp *BlockProcessor) ProcessOperations(ctx context.Context, ops []*protocol.OperationObject) ([]*models.Operation, error) {
 	var operations []*models.Operation
 
-	for _, opObj := range ops {
+	for opIndex, opObj := range ops {
 		// Parse timestamp from OperationObject
 		var opTime time.Time
 		if opObj.Timestamp != nil && opObj.Timestamp.Time != nil {
@@ -214,10 +214,12 @@ func (bp *BlockProcessor) ProcessOperations(ctx context.Context, ops []*protocol
 			}
 
 			// Create operation model
+			// Use opIndex instead of OperationInTransaction because the latter is always 0
+			// when using get_ops_in_block API
 			op := &models.Operation{
 				BlockNum:  int64(opObj.BlockNumber),
 				TrxID:     trxID,
-				OpInTrx:   int(opObj.OperationInTransaction),
+				OpInTrx:   opIndex,
 				Account:   account,
 				OpType:    opType,
 				OpData:    opData,
