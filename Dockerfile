@@ -1,5 +1,5 @@
 # Build stage for Go services
-FROM golang:1.23-alpine3.19 AS go-builder
+FROM golang:1.27.3-alpine AS go-builder
 
 WORKDIR /build
 
