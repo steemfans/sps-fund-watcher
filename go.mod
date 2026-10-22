@@ -2,6 +2,8 @@ module github.com/ety001/sps-fund-watcher
 
 go 1.23.0
 
+toolchain go1.27.3
+
 require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/steemit/steemgosdk v0.0.12
